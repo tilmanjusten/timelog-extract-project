@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const util = require('util');
+const arg = process.argv.slice(2);
+
+function filter_logs(logs, project_name) {
+    const pattern = new RegExp(`${project_name}\\s::`);
+
+    return logs.split('\n').filter(function(line) {
+        return line.match(pattern);
+    });
+}
+
+function writeFile(filename, content) {
+    fs.writeFileSync(filename, content, 'utf8');
+}
+
+if (arg.length) {
+    const project_name = arg[0].replace(/^(-)+/, '');
+    const filename = arg.length > 1 ? arg[1].replace(/^(-)+/, '') : 'log.txt';
+
+    switch (project_name) {
+        case 'h':
+        case 'help':
+            showHelp();
+            break;
+        default:
+            fs.readFile(filename, "utf8", function (err, content) {
+                if (err) {
+                    util.puts("Invalid file : " + arg);
+                    process.exit(1);
+                } else {
+                    const logs = filter_logs(content, project_name);
+
+                    writeFile(`${project_name}.txt`, logs.join('\n') + '\n');
+                }
+            });
+    }
+} else {
+    showHelp();
+}
+
+function showHelp() {
+    util.puts("Usage: node ./extract-logs <project_name> [<input_filename>]");
+    util.puts("\nIf no input file is specified, assume log.txt.");
+    util.puts("\nOptions:");
+    util.puts("\t--help, -h  Print usage info");
+}
