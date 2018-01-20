@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const arg = process.argv.slice(2);
+const argv = process.argv.slice(2);
 const pattern_log_entry = /(\d+)\-(\d+)\-(\d+)\s+(\d+:\d+)\s+([^\n]+)/i
 
 function buildLogEntry(match) {
@@ -68,29 +68,48 @@ function createLogString(log_entry) {
     return `${date_string}   ${log_string}`;
 }
 
+function createReportString(log_entry) {
+    const d = log_entry.date;
+    const duration_minutes = Math.ceil(log_entry.duration / 60);
+    const date_string = `${pad(d.getDate(), 2, 0)}-${pad(d.getMonth() + 1, 2, 0)}-${d.getFullYear()} ${pad(d.getHours(), 2, 0)}:${pad(d.getMinutes(), 2, 0)}`;
+    const log_string = log_entry.task;
+
+    return `${date_string} (${duration_minutes} min)\t${log_string}`;
+}
+
 function writeFile(filename, content) {
     fs.writeFileSync(filename, content, 'utf8');
 }
 
-if (arg.length) {
-    const arg_0 = arg[0].replace(/^(-)+/, '');
-    const arg_1 = arg.length > 1 ? arg[1].replace(/^(-)+/, '') : 'log.txt';
+if (argv.length) {
+    const project_name = argv[0].replace(/^(-)+/, '');
+    const filename = argv.length > 1 ? argv[1].replace(/^(-)+/, '') : 'log.txt';
+    const report = argv.length > 2 && (argv[2].replace(/^(-)+/, '') === 'report' || argv[2].replace(/^(-)+/, '') === 'r');
 
-    switch (arg_0) {
+    switch (project_name) {
         case 'h':
         case 'help':
             showHelp();
             break;
         default:
-            fs.readFile(arg_1, "utf8", function (err, content) {
+            fs.readFile(filename, "utf8", function (err, content) {
                 if (err) {
                     console.log("Invalid file : " + arg);
                     process.exit(1);
                 } else {
-                    const logs = filter_logs(content, arg_0);
-                    const lines = logs.map(createLogString);
+                    const logs = filter_logs(content, project_name);
+                    let lines;
 
-                    writeFile(`${arg_0}.txt`, lines.join('\n') + '\n');
+                    if (report) {
+                        lines = logs.map(createReportString);
+                        const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
+                        const hours = Math.round(minutes / 60 * 100) / 100;
+                        lines.push(['\n', `Total: ${hours} h (${minutes} min)`]);
+                    } else {
+                        lines = logs.map(createLogString);
+                    }
+
+                    writeFile(`${project_name}.txt`, lines.join('\n') + '\n');
                 }
             });
     }
@@ -99,8 +118,9 @@ if (arg.length) {
 }
 
 function showHelp() {
-    console.log("Usage: node ./extract-logs <project_name> [<input_filename>]");
+    console.log("Usage: node ./extract-logs <project_name> [<input_filename>] [<options]");
     console.log("\nIf no input file is specified, assume log.txt.");
     console.log("\nOptions:");
     console.log("\t--help, -h  Print usage info");
+    console.log("\t--report, -r  Save result as report");
 }
