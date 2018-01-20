@@ -2,13 +2,59 @@
 
 const fs = require('fs');
 const arg = process.argv.slice(2);
+const pattern_log_entry = /(\d+)\-(\d+)\-(\d+\s+\d+:\d+)\s+([^\n]+)/i
+
+function buildLogEntry(match) {
+    const log = match[4].trim();
+    const is_task = log.indexOf('::') > -1;
+
+    return {
+        raw: match[0],
+        // switch day and month
+        date: new Date(`${match[2]}-${match[1]}-${match[3]}`),
+        slacking: log.indexOf('**') > -1,
+        start: log.trim() === '__start__',
+        project_name: is_task ? log.match(/(.+)\s?::/i)[1].trim() : null,
+        task: is_task ? log.match(/::\s?([^\n]+)/i)[1].trim() : null,
+        // unit will be seconds
+        duration: null 
+    }
+}
+
+function calculateDuration(log_entries) {
+    let prev = log_entries.shift();
+
+    for (let entry of log_entries) {
+        entry.duration = Math.abs((entry.date.getTime() - prev.date.getTime()) / 1000);
+
+        prev = entry;
+    }
+
+    return log_entries;
+}
 
 function filter_logs(logs, project_name) {
-    const pattern = new RegExp(`${project_name}\\s::`);
+    const pattern_project = new RegExp(`${project_name}\\s?::`);
+    const lines = logs.split('\n');
+    const log_entries_raw = lines.map(line => line.match(pattern_log_entry)).filter(log_entry => !!log_entry);
+    let log_entries = log_entries_raw.map(buildLogEntry);
 
-    return logs.split('\n').filter(function(line) {
-        return line.match(pattern);
-    });
+    log_entries = calculateDuration(log_entries);
+
+    return log_entries.filter(log_entry => log_entry.project_name === project_name);
+}
+
+function pad(val, len, fill) {
+    return val.toString().padStart(len, fill);
+}
+
+function createLogString(log_entry) {
+    const d = log_entry.date;
+    const duration_minutes = Math.ceil(log_entry.duration / 60);
+    const date_string = `${pad(d.getDate(), 2, 0)}-${pad(d.getMonth() + 1, 2, 0)}-${d.getFullYear()} ${pad(d.getHours(), 2, 0)}:${pad(d.getMinutes(), 2, 0)}`;
+    const log = `${log_entry.project_name} :: ${log_entry.task} (${duration_minutes} min)`;
+
+    return `${date_string}\t${log}`;
 }
 
 function writeFile(filename, content) {
@@ -31,6 +77,7 @@ if (arg.length) {
                     process.exit(1);
                 } else {
                     const logs = filter_logs(content, arg_0);
+                    const lines = logs.map(createLogString);
 
                     writeFile(`${arg_0}.txt`, lines.join('\n') + '\n');
                 }
