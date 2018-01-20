@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const util = require('util');
 const arg = process.argv.slice(2);
 
 function filter_logs(logs, project_name) {
@@ -28,7 +27,7 @@ if (arg.length) {
         default:
             fs.readFile(filename, "utf8", function (err, content) {
                 if (err) {
-                    util.puts("Invalid file : " + arg);
+                    console.log("Invalid file : " + arg);
                     process.exit(1);
                 } else {
                     const logs = filter_logs(content, project_name);
@@ -42,8 +41,8 @@ if (arg.length) {
 }
 
 function showHelp() {
-    util.puts("Usage: node ./extract-logs <project_name> [<input_filename>]");
-    util.puts("\nIf no input file is specified, assume log.txt.");
-    util.puts("\nOptions:");
-    util.puts("\t--help, -h  Print usage info");
+    console.log("Usage: node ./extract-logs <project_name> [<input_filename>]");
+    console.log("\nIf no input file is specified, assume log.txt.");
+    console.log("\nOptions:");
+    console.log("\t--help, -h  Print usage info");
 }
