@@ -16,23 +16,23 @@ function writeFile(filename, content) {
 }
 
 if (arg.length) {
-    const project_name = arg[0].replace(/^(-)+/, '');
-    const filename = arg.length > 1 ? arg[1].replace(/^(-)+/, '') : 'log.txt';
+    const arg_0 = arg[0].replace(/^(-)+/, '');
+    const arg_1 = arg.length > 1 ? arg[1].replace(/^(-)+/, '') : 'log.txt';
 
-    switch (project_name) {
+    switch (arg_0) {
         case 'h':
         case 'help':
             showHelp();
             break;
         default:
-            fs.readFile(filename, "utf8", function (err, content) {
+            fs.readFile(arg_1, "utf8", function (err, content) {
                 if (err) {
                     console.log("Invalid file : " + arg);
                     process.exit(1);
                 } else {
-                    const logs = filter_logs(content, project_name);
+                    const logs = filter_logs(content, arg_0);
 
-                    writeFile(`${project_name}.txt`, logs.join('\n') + '\n');
+                    writeFile(`${arg_0}.txt`, lines.join('\n') + '\n');
                 }
             });
     }
