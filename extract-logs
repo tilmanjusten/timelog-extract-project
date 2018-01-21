@@ -4,11 +4,13 @@ const fs = require('fs');
 const args = parseArgv(process.argv.slice(2));
 const pattern_log_entry = /(\d+)\-(\d+)\-(\d+)\s+(\d+:\d+)\s+([^\n]+)/i;
 const pattern_ticket = /#(\d+)/i;
+const pattern_subproject = /::\s?(.+):/i;
 
 function buildLogEntry(match) {
     const log = match[5].trim();
     const is_task = log.indexOf('::') > -1;
     const has_ticket_id = log.search(pattern_ticket) > -1;
+    const has_subproject_id = log.search(pattern_subproject) > -1;
 
     const log_entry = {
         raw: match[0],
@@ -20,7 +22,8 @@ function buildLogEntry(match) {
         task: is_task ? log.match(/::\s?([^\n]+)/i)[1].trim() : log.trim(),
         // unit will be seconds
         duration: null,
-        ticket: has_ticket_id ? log.match(pattern_ticket)[1] : null
+        ticket: has_ticket_id ? log.match(pattern_ticket)[1] : null,
+        subproject: has_subproject_id ? log.match(pattern_subproject)[1] : null
     };
 
     return log_entry;
@@ -211,7 +214,7 @@ function parseArgv(args) {
             result.report = true;
         } else if (is_option && (item === 's' || item === 'simple')) {
             result.simple = true;
-        } 
+        }
         // first not option has to be the project name
         else if (!is_option && result.project_name === null) {
             result.project_name = item;
