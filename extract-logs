@@ -52,7 +52,17 @@ function filter_logs(logs, project_name) {
 
     log_entries = calculateDuration(log_entries);
 
-    return log_entries.filter(log_entry => log_entry.project_name === project_name);
+    if (args.date_start) {
+        log_entries = log_entries.filter(log_entry => log_entry.date.getTime() >= args.date_start.getTime());
+    }
+
+    if (args.date_until) {
+        log_entries = log_entries.filter(log_entry => log_entry.date.getTime() <= args.date_until.getTime());
+    }
+
+    const result = log_entries.filter(log_entry => log_entry.project_name === project_name);
+
+    return result;
 }
 
 function pad(val, len, fill) {
@@ -197,6 +207,8 @@ function showHelp() {
     console.log("\t--report, -r  Save result as report");
     console.log("\t--simple, -s  Simple reports");
     console.log("\t  only available when report option is set");
+    console.log("\t--date-start=<date_start>, -ds=<date_start>  Start date (YYYY-MM-DD)");
+    console.log("\t--date-until=<date_until>, -du=<date_until>  Start until (YYYY-MM-DD)");
 }
 
 function parseArgv(args) {
@@ -205,13 +217,16 @@ function parseArgv(args) {
         project_name: null,
         report: false,
         simple: false,
-        help: false
+        help: false,
+        date_start: null,
+        date_until: null
     };
 
     for (let item of args) {
         const is_option = item.indexOf('-') > -1;
         
         item = item.replace(/^-+/, '');
+        const item_value = item.match(/.+=([^\s]+)/i);
         
         if (is_option && (item === 'h' || item === 'help')) {
             result.help = true;
@@ -219,6 +234,10 @@ function parseArgv(args) {
             result.report = true;
         } else if (is_option && (item === 's' || item === 'simple')) {
             result.simple = true;
+        } else if (is_option && item_value && item.search(/(ds|date-start)=\d{2,4}-\d{1,2}-\d{1,2}/i) > -1) {
+            result.date_start = new Date(item_value[1]);
+        } else if (is_option && item_value && item.search(/(du|date-until)=\d{2,4}-\d{1,2}-\d{1,2}/i) > -1) {
+            result.date_until = new Date(item_value[1]);
         }
         // first not option has to be the project name
         else if (!is_option && result.project_name === null) {
@@ -227,7 +246,7 @@ function parseArgv(args) {
         // second not option has to be the file name
         else if (!is_option && result.project_name !== null && item.length) {
             result.filename = item;
-        } 
+        }
     }
 
     return result;
