@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const argv = process.argv.slice(2);
-const pattern_log_entry = /(\d+)\-(\d+)\-(\d+)\s+(\d+:\d+)\s+([^\n]+)/i
+const args = parseArgv(process.argv.slice(2));
 
 function buildLogEntry(match) {
     const log = match[5].trim();
@@ -81,26 +80,16 @@ function writeFile(filename, content) {
     fs.writeFileSync(filename, content, 'utf8');
 }
 
-if (argv.length) {
-    const project_name = argv[0].replace(/^(-)+/, '');
-    const filename = argv.length > 1 ? argv[1].replace(/^(-)+/, '') : 'log.txt';
-    const report = argv.length > 2 && (argv[2].replace(/^(-)+/, '') === 'report' || argv[2].replace(/^(-)+/, '') === 'r');
-
-    switch (project_name) {
-        case 'h':
-        case 'help':
-            showHelp();
-            break;
-        default:
-            fs.readFile(filename, "utf8", function (err, content) {
+if (process.argv.length > 2 && args.help === false) {
+    fs.readFile(args.filename, "utf8", function (err, content) {
                 if (err) {
                     console.log("Invalid file : " + arg);
                     process.exit(1);
                 } else {
-                    const logs = filter_logs(content, project_name);
+            const logs = filter_logs(content, args.project_name);
                     let lines;
 
-                    if (report) {
+            if (args.report) {
                         lines = logs.map(createReportString);
                         const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
                         const hours = Math.round(minutes / 60 * 100) / 100;
@@ -112,7 +101,6 @@ if (argv.length) {
                     writeFile(`${project_name}.txt`, lines.join('\n') + '\n');
                 }
             });
-    }
 } else {
     showHelp();
 }
@@ -123,4 +111,35 @@ function showHelp() {
     console.log("\nOptions:");
     console.log("\t--help, -h  Print usage info");
     console.log("\t--report, -r  Save result as report");
+}
+
+function parseArgv(args) {
+    let result = {
+        filename: 'log.txt',
+        project_name: null,
+        report: false,
+        help: false
+    };
+
+    for (let item of args) {
+        const is_option = item.indexOf('-') > -1;
+        
+        item = item.replace(/^-+/, '');
+        
+        if (is_option && (item === 'h' || item === 'help')) {
+            result.help = true;
+        } else if (is_option && (item === 'r' || item === 'report')) {
+            result.report = true;
+        } 
+        // first not option has to be the project name
+        else if (!is_option && result.project_name === null) {
+            result.project_name = item;
+        }
+        // second not option has to be the file name
+        else if (!is_option && result.project_name !== null && item.length) {
+            result.filename = item;
+        } 
+    }
+
+    return result;
 }
