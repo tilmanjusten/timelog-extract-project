@@ -81,6 +81,76 @@ function createReportString(log_entry) {
     return `${date_string}\t${duration_minutes} min\t\t${ticket_string}\t\t${log_string}`;
 }
 
+function createReportStringByTicket(log_entry) {
+    const d = log_entry.date;
+    const duration_minutes = Math.ceil(log_entry.duration / 60);
+    const date_string = `${d.getFullYear()}-${pad(d.getMonth() + 1, 2, 0)}-${pad(d.getDate(), 2, 0)} ${pad(d.getHours(), 2, 0)}:${pad(d.getMinutes(), 2, 0)}`;
+    const pattern_remove_ticket_id = new RegExp(`([^\\s]+)?#?${log_entry.ticket}:?\\s?`);
+    const log_string = log_entry.task.replace(pattern_remove_ticket_id, '');
+
+    return `${date_string}\t${duration_minutes} min\t\t${log_string}`;
+}
+
+function groupByTicket(logs) {
+    let lines_by_ticket = {};
+
+    // create psuedo ticket ids
+    for (const log_entry of logs) {
+        if (log_entry.ticket) {
+            continue;
+        }
+
+        const testing = log_entry.task.match(/(testing|browser|ie\d|edge|fx|firefox|chrome|safari|ios|android|windows)/i);
+        const meeting = log_entry.task.match(/(briefing|meeting|status|abstimmung|kickoff)/i);
+        const preps = log_entry.task.match(/(tickets|übergabe)/i);
+        const docs = log_entry.task.match(/(doku|docs?:)/i);
+
+        if (testing) {
+            log_entry.ticket = 'Testing';
+        } else if (meeting) {
+            log_entry.ticket = 'Meeting';
+        } else if (preps) {
+            log_entry.ticket = 'Preparations';
+        } else if (docs) {
+            log_entry.ticket = 'Documentation';
+        } else {
+            log_entry.ticket = '-';
+        }
+    }
+
+    // group log entries by their ticket id
+    for (const log_entry of logs) {
+        const ticket_id = log_entry.ticket || '---';
+
+        if (!lines_by_ticket[ticket_id]) {
+            lines_by_ticket[ticket_id] = [];
+        }
+
+        lines_by_ticket[ticket_id].push(log_entry);
+    }
+
+    // flatten
+    let lines = [];
+
+    for (const ticket_id in lines_by_ticket) { 
+        lines.push(`Ticket ${ticket_id}:`);
+
+        let duration = 0;
+
+        for (const log_entry of lines_by_ticket[ticket_id]) {
+            lines.push(createReportStringByTicket(log_entry));
+            duration += log_entry.duration;
+        }
+
+        const minutes = Math.ceil(duration / 60);
+        const hours = Math.round(minutes / 60 * 100) / 100;
+
+        lines.push(`Subtotal: ${hours} h (${minutes} min)\n`);
+    }
+
+    return lines;
+}
+
 function writeFile(filename, content) {
     fs.writeFileSync(filename, content, 'utf8');
 }
@@ -92,12 +162,13 @@ if (process.argv.length > 2 && args.help === false) {
             process.exit(1);
         } else {
             const logs = filter_logs(content, args.project_name);
+            const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
+            const hours = Math.round(minutes / 60 * 100) / 100;
             let lines;
 
             if (args.report) {
-                lines = logs.map(createReportString);
-                const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
-                const hours = Math.round(minutes / 60 * 100) / 100;
+                lines = args.simple ? logs.map(createReportString) : groupByTicket(logs);
+
                 lines.push(`\nTotal: ${hours} h (${minutes} min)`);
             } else {
                 lines = logs.map(createLogString);
@@ -116,6 +187,8 @@ function showHelp() {
     console.log("\nOptions:");
     console.log("\t--help, -h  Print usage info");
     console.log("\t--report, -r  Save result as report");
+    console.log("\t--simple, -s  Simple reports");
+    console.log("\t  only available when report option is set");
 }
 
 function parseArgv(args) {
@@ -123,6 +196,7 @@ function parseArgv(args) {
         filename: 'log.txt',
         project_name: null,
         report: false,
+        simple: false,
         help: false
     };
 
@@ -135,6 +209,8 @@ function parseArgv(args) {
             result.help = true;
         } else if (is_option && (item === 'r' || item === 'report')) {
             result.report = true;
+        } else if (is_option && (item === 's' || item === 'simple')) {
+            result.simple = true;
         } 
         // first not option has to be the project name
         else if (!is_option && result.project_name === null) {
