@@ -2,10 +2,13 @@
 
 const fs = require('fs');
 const args = parseArgv(process.argv.slice(2));
+const pattern_log_entry = /(\d+)\-(\d+)\-(\d+)\s+(\d+:\d+)\s+([^\n]+)/i;
+const pattern_ticket = /#(\d+)/i;
 
 function buildLogEntry(match) {
     const log = match[5].trim();
     const is_task = log.indexOf('::') > -1;
+    const has_ticket_id = log.search(pattern_ticket) > -1;
 
     const log_entry = {
         raw: match[0],
@@ -16,7 +19,8 @@ function buildLogEntry(match) {
         project_name: is_task ? log.match(/(.+)\s?::/i)[1].trim() : null,
         task: is_task ? log.match(/::\s?([^\n]+)/i)[1].trim() : log.trim(),
         // unit will be seconds
-        duration: null 
+        duration: null,
+        ticket: has_ticket_id ? log.match(pattern_ticket)[1] : null
     };
 
     return log_entry;
@@ -70,10 +74,11 @@ function createLogString(log_entry) {
 function createReportString(log_entry) {
     const d = log_entry.date;
     const duration_minutes = Math.ceil(log_entry.duration / 60);
-    const date_string = `${pad(d.getDate(), 2, 0)}-${pad(d.getMonth() + 1, 2, 0)}-${d.getFullYear()} ${pad(d.getHours(), 2, 0)}:${pad(d.getMinutes(), 2, 0)}`;
+    const date_string = `${d.getFullYear()}-${pad(d.getMonth() + 1, 2, 0)}-${pad(d.getDate(), 2, 0)} ${pad(d.getHours(), 2, 0)}:${pad(d.getMinutes(), 2, 0)}`;
     const log_string = log_entry.task;
+    const ticket_string = log_entry.ticket ? `#${log_entry.ticket}` : '-    ';
 
-    return `${date_string} (${duration_minutes} min)\t${log_string}`;
+    return `${date_string}\t${duration_minutes} min\t\t${ticket_string}\t\t${log_string}`;
 }
 
 function writeFile(filename, content) {
@@ -82,25 +87,25 @@ function writeFile(filename, content) {
 
 if (process.argv.length > 2 && args.help === false) {
     fs.readFile(args.filename, "utf8", function (err, content) {
-                if (err) {
-                    console.log("Invalid file : " + arg);
-                    process.exit(1);
-                } else {
+        if (err) {
+            console.log("Invalid file : " + arg);
+            process.exit(1);
+        } else {
             const logs = filter_logs(content, args.project_name);
-                    let lines;
+            let lines;
 
             if (args.report) {
-                        lines = logs.map(createReportString);
-                        const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
-                        const hours = Math.round(minutes / 60 * 100) / 100;
-                        lines.push(['\n', `Total: ${hours} h (${minutes} min)`]);
-                    } else {
-                        lines = logs.map(createLogString);
-                    }
+                lines = logs.map(createReportString);
+                const minutes = Math.ceil((logs.map(le => le.duration).reduce((p, c) => p + c)) / 60);
+                const hours = Math.round(minutes / 60 * 100) / 100;
+                lines.push(`\nTotal: ${hours} h (${minutes} min)`);
+            } else {
+                lines = logs.map(createLogString);
+            }
 
-                    writeFile(`${project_name}.txt`, lines.join('\n') + '\n');
-                }
-            });
+            writeFile(`${args.project_name}.txt`, lines.join('\n') + '\n');
+        }
+    });
 } else {
     showHelp();
 }
