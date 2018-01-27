@@ -4,13 +4,11 @@ const fs = require('fs');
 const args = parseArgv(process.argv.slice(2));
 const pattern_log_entry = /(\d+)\-(\d+)\-(\d+)\s+(\d+:\d+)\s+([^\n]+)/i;
 const pattern_ticket = /#(\d+)/i;
-const pattern_subproject = /::\s?(.+):/i;
 
 function buildLogEntry(match) {
     const log = match[5].trim();
     const is_task = log.indexOf('::') > -1;
     const has_ticket_id = log.search(pattern_ticket) > -1;
-    const has_subproject_id = log.search(pattern_subproject) > -1;
 
     const log_entry = {
         raw: match[0],
@@ -22,8 +20,7 @@ function buildLogEntry(match) {
         task: is_task ? log.match(/::\s?([^\n]+)/i)[1].trim() : log.trim(),
         // unit will be seconds
         duration: null,
-        ticket: has_ticket_id ? log.match(pattern_ticket)[1] : null,
-        subproject: has_subproject_id ? log.match(pattern_subproject)[1] : null
+        ticket: has_ticket_id ? log.match(pattern_ticket)[1] : null
     };
 
     return log_entry;
@@ -45,7 +42,6 @@ function calculateDuration(log_entries) {
 }
 
 function filter_logs(logs, project_name) {
-    const pattern_project = new RegExp(`${project_name}\\s?::`);
     const lines = logs.split('\n');
     const log_entries_raw = lines.map(line => line.match(pattern_log_entry)).filter(log_entry => !!log_entry);
     let log_entries = log_entries_raw.map(buildLogEntry);
@@ -58,6 +54,12 @@ function filter_logs(logs, project_name) {
 
     if (args.date_until) {
         log_entries = log_entries.filter(log_entry => log_entry.date.getTime() <= args.date_until.getTime());
+    }
+
+    if (args.filter) {
+        const pattern_filter = new RegExp(args.filter, 'gi');
+
+        log_entries = log_entries.filter(log_entry => log_entry.raw.match(pattern_filter));
     }
 
     const result = log_entries.filter(log_entry => log_entry.project_name === project_name);
@@ -217,6 +219,7 @@ function showHelp() {
     console.log("\t--date-start=<date_start>, -ds=<date_start>  Start date (YYYY-MM-DD)");
     console.log("\t--date-until=<date_until>, -du=<date_until>  Start until (YYYY-MM-DD)");
     console.log("\t--output=<filename>, -o=<filename>  Write result to file");
+    console.log("\t--filter=<pattern>, -f=<filter>  Filter result by pattern");
 }
 
 function parseArgv(args) {
@@ -229,7 +232,8 @@ function parseArgv(args) {
         date_start: null,
         date_until: null,
         filename_out: null,
-        use_stdout: true
+        use_stdout: true,
+        filter: null
     };
 
     for (let item of args) {
@@ -251,6 +255,8 @@ function parseArgv(args) {
         } else if (is_option && item_value && item.search(/(o|output)=([^\s]+|"[^"]+")/i) > -1) {
             result.filename_out = item_value[1];
             result.use_stdout = false;
+        } else if (is_option && item_value && item.search(/(f|filter)=([^\s]+|"[^"]+")/i) > -1) {
+            result.filter = item_value[1];
         }
         // first not option has to be the project name
         else if (!is_option && result.project_name === null) {
