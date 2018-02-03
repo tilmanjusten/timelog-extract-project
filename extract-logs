@@ -209,7 +209,7 @@ if (process.argv.length > 2 && args.help === false) {
 }
 
 function showHelp() {
-    console.log("Usage: node ./extract-logs <project_name> [<input_filename>] [<options]");
+    console.log("Usage: ./extract-logs <project_name> [<input_filename>] [<options]");
     console.log("\nIf no input file is specified, assume log.txt.");
     console.log("\nOptions:");
     console.log("\t--help, -h  Print usage info");
